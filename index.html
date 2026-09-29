@@ -6,16 +6,15 @@
 <title>VK Cleaner</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 20px auto; padding: 16px; color: #333; }
-  button { padding: 12px 20px; margin: 4px; cursor: pointer; border: none; border-radius: 6px; background: #0077FF; color: white; font-size: 16px; }
+  button { padding: 12px 20px; margin: 4px; cursor: pointer; border: none; border-radius: 6px; background: #0077FF; color: white; font-size: 16px; width: 100%; }
   button:hover { background: #0066DD; }
   button.danger { background: #FF3347; }
   button.danger:hover { background: #E62E40; }
   .group { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
   .group input { margin-right: 12px; transform: scale(1.2); }
   #progress { margin: 15px 0; font-weight: bold; color: #0077FF; }
-  input[type="text"] { padding: 10px; width: 100%; max-width: 350px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+  input[type="text"] { padding: 12px; width: 100%; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
   .hint { font-size: 0.95em; color: #444; background: #f0f2f5; padding: 15px; border-radius: 8px; margin: 15px 0; line-height: 1.5; }
-  .hint code { background: #e4e6eb; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #d32f2f; }
 </style>
 </head>
 <body>
@@ -23,29 +22,28 @@
 <h1>🧹 VK Cleaner</h1>
 
 <div id="authBlock">
-  <p><b>App ID:</b> <input id="appId" type="text" value="6287487" readonly style="background:#e9ecef; color:#666;"></p>
+  <p><b>App ID:</b> <input type="text" value="6287487" readonly style="background:#e9ecef; color:#666; padding: 10px; width: 100%; box-sizing: border-box; border-radius: 6px; border: 1px solid #ccc;"></p>
   
   <button onclick="openAuth()">1. Открыть окно авторизации ВК</button>
   
   <div class="hint">
-    <b>Как получить токен (займет 15 секунд):</b><br>
-    1. После нажатия кнопки выше войдите в свой аккаунт ВК и разрешите доступ.<br>
-    2. Страница перенаправит вас на адрес вида:<br>
-    <code>https://oauth.vk.com/blank.html#access_token=ВАШ_ДЛИННЫЙ_ТОКЕН&...</code><br>
-    3. Выделите и скопируйте только сам токен (строку сразу после <code>access_token=</code> и до следующего символа <code>&</code>).<br>
-    4. Вставьте его в поле ниже и нажмите "Применить".
+    <b>Как войти (займет 10 секунд):</b><br>
+    1. Нажмите кнопку выше, войдите в ВК и разрешите доступ.<br>
+    2. Когда откроется пустая страница с адресом <code>oauth.vk.com/blank.html#access_token=...</code><br>
+    3. <b>Скопируйте всю адресную строку целиком</b> и вставьте её в поле ниже.<br>
+    4. Нажмите "Применить". Скрипт сам найдет и сохранит токен.
   </div>
 
-  <p><b>Вставьте access_token:</b></p>
-  <input id="tokenInput" type="text" placeholder="Скопируйте токен из адресной строки и вставьте сюда">
+  <p><b>Вставьте всю ссылку из адресной строки:</b></p>
+  <input id="tokenInput" type="text" placeholder="https://oauth.vk.com/blank.html#access_token=...">
   <br>
-  <button onclick="applyToken()">2. Применить токен</button>
+  <button onclick="applyToken()">2. Применить ссылку</button>
 </div>
 
 <div id="mainBlock" style="display:none">
   <button onclick="loadGroups()">🔄 Загрузить группы</button>
   <button class="danger" onclick="unsubSelected()">❌ Отписаться от выбранных</button>
-  <button onclick="logout()" style="background:#888;">Выйти / Сбросить</button>
+  <button onclick="logout()" style="background:#888; margin-top: 10px;">Выйти / Сбросить токен</button>
   
   <div id="progress"></div>
   <div id="list"></div>
@@ -63,21 +61,35 @@ function openAuth() {
   const url = `https://oauth.vk.com/authorize?client_id=${APP_ID}` +
               `&display=page&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
               `&scope=groups&response_type=token&v=${API_V}`;
-  // Открываем в новом окне/вкладке
   window.open(url, 'vk_auth', 'width=600,height=700');
 }
 
 function applyToken() {
-  const t = document.getElementById('tokenInput').value.trim();
-  if (!t || t.length < 10) { 
-    alert('Токен слишком короткий или пустой. Проверьте, что вы скопировали его полностью.'); 
+  const inputStr = document.getElementById('tokenInput').value.trim();
+  if (!inputStr) { 
+    alert('Поле пустое. Скопируйте и вставьте адресную строку.'); 
     return; 
   }
-  localStorage.setItem('vk_token', t);
-  token = t;
-  document.getElementById('authBlock').style.display = 'none';
-  document.getElementById('mainBlock').style.display = 'block';
-  document.getElementById('tokenInput').value = '';
+
+  try {
+    // Программно парсим вставленную ссылку
+    const url = new URL(inputStr);
+    // Токен находится в хеше (после #), извлекаем его
+    const hashParams = new URLSearchParams(url.hash.substring(1));
+    const t = hashParams.get('access_token');
+
+    if (t && t.length > 10) {
+      localStorage.setItem('vk_token', t);
+      token = t;
+      document.getElementById('authBlock').style.display = 'none';
+      document.getElementById('mainBlock').style.display = 'block';
+      document.getElementById('tokenInput').value = ''; // Очищаем поле для безопасности
+    } else {
+      alert('Не удалось найти access_token в этой ссылке. Убедитесь, что вы скопировали адресную строку полностью после успешной авторизации.');
+    }
+  } catch (e) {
+    alert('Это не похоже на корректную ссылку. Пожалуйста, скопируйте всю адресную строку из браузера.');
+  }
 }
 
 function logout() {
@@ -108,7 +120,7 @@ async function loadGroups() {
   } catch (e) {
     document.getElementById('progress').textContent = '❌ Ошибка: ' + e.message;
     if (e.message.includes('token') || e.message.includes('auth')) {
-      alert('Токен недействителен или истек. Пожалуйста, получите новый.');
+      alert('Токен недействителен или истек. Нажмите "Выйти" и получите новый.');
       logout();
     }
   }
@@ -129,8 +141,8 @@ function renderList() {
 
 async function unsubSelected() {
   const ids = groups.filter(g => g.selected).map(g => g.id);
-  if (!ids.length) { alert('Снимите галочки с групп, которые хотите оставить, или выберите хотя бы одну для отписки.'); return; }
-  if (!confirm(`Вы уверены, что хотите отписаться от ${ids.length} групп? Это действие необратимо.`)) return;
+  if (!ids.length) { alert('Выберите хотя бы одну группу для отписки (снимите галочки с тех, что хотите оставить).'); return; }
+  if (!confirm(`Вы уверены, что хотите отписаться от ${ids.length} групп?`)) return;
 
   const prog = document.getElementById('progress');
   let done = 0;
@@ -139,19 +151,15 @@ async function unsubSelected() {
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
     for (const id of batch) {
-      try { 
-        await api('groups.leave', { group_id: id }); 
-      } catch(e) {
-        console.warn('Не удалось отписаться от id:', id, e);
-      }
+      try { await api('groups.leave', { group_id: id }); } catch(e) {}
       done++;
       prog.textContent = `⏳ Отписано: ${done} из ${ids.length}`;
-      await sleep(350); // Задержка 350мс, чтобы ВК не заблокировал частые запросы
+      await sleep(350); // Защита от бана за частые запросы
     }
-    if (i < batches.length - 1) await sleep(1000); // Пауза 1 сек между пачками по 25
+    if (i < batches.length - 1) await sleep(1000);
   }
   prog.textContent = `🎉 Готово! Успешно отписался от ${done} групп.`;
-  loadGroups(); // Обновляем список
+  loadGroups();
 }
 
 function chunk(arr, size) {
@@ -161,12 +169,15 @@ function chunk(arr, size) {
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// Инициализация при загрузке страницы
+// Инициализация
 if (token) {
   document.getElementById('authBlock').style.display = 'none';
   document.getElementById('mainBlock').style.display = 'block';
 }
 </script>
+
+</body>
+</html>
 
 </body>
 </html>
