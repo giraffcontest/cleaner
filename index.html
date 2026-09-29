@@ -32,6 +32,9 @@
 
 <script>
 const API_V = '5.131';
+// ⚠️ ВАЖНО: этот путь должен совпадать с Redirect URI в настройках VK-приложения
+const REDIRECT_URI = 'https://giraffcontest.github.io/cleaner/';
+
 let token = localStorage.getItem('vk_token');
 let groups = [];
 
@@ -44,7 +47,7 @@ function login() {
   if (!appId) { alert('Введи APP ID'); return; }
   localStorage.setItem('vk_app_id', appId);
   const url = `https://oauth.vk.com/authorize?client_id=${appId}` +
-              `&display=page&redirect_uri=https://oauth.vk.com/blank.html` +
+              `&display=page&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
               `&scope=groups&response_type=token&v=${API_V}`;
   window.location.href = url;
 }
@@ -56,7 +59,8 @@ function checkTokenFromUrl() {
   const t = params.get('access_token');
   if (t) {
     localStorage.setItem('vk_token', t);
-    window.location.hash = '';
+    // Возвращаемся на чистый URL (без хеша с токеном)
+    window.history.replaceState({}, document.title, '/cleaner/');
     window.location.reload();
   }
 }
@@ -111,14 +115,15 @@ async function unsubSelected() {
   let done = 0;
   const batches = chunk(ids, 25);
 
-  for (const batch of batches) {
-    await Promise.all(batch.map(async id => {
+  for (let i = 0; i < batches.length; i++) {
+    const batch = batches[i];
+    for (const id of batch) {
       try { await api('groups.leave', { group_id: id }); } catch(e) {}
       done++;
       prog.textContent = `Отписано: ${done} / ${ids.length}`;
       await sleep(350);
-    }));
-    if (batches.indexOf(batch) < batches.length - 1) await sleep(1000);
+    }
+    if (i < batches.length - 1) await sleep(1000);
   }
   prog.textContent = `Готово! Отписался от ${done} групп.`;
   loadGroups();
